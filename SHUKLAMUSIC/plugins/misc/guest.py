@@ -53,7 +53,7 @@ async def guest_username_mention(_, message: Message):
     result = InlineQueryResultArticle(
         title="❖ 𝗗𝗼𝗼𝗺 𝗠𝘂𝘀𝗶𝗰",
         description="Tap to send the Add Me card in this chat 🎵",
-        thumb_url="https://files.catbox.moe/qv2ob4.jpg",
+        thumb_url="https://files.catbox.moe/w5nima.jpg",
         input_message_content=InputTextMessageContent(ADD_ME_PROMO_TEXT),
         reply_markup=_add_me_markup(),
     )
