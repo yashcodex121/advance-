@@ -47,19 +47,6 @@ if hasattr(filters, "video_chat_participants_invited"):
             pass
 
 
-@app.on_message(filters.command("math"))
-async def calculate_math(_, message: Message):
-    if len(message.command) < 2:
-        return await message.reply_text("❌ Usage:\n`/math 2+2`", quote=True)
-    expression = message.text.split(None, 1)[1]
-    try:
-        result = eval(expression)
-        response = f"✅ **Result:** `{result}`"
-    except Exception:
-        response = "❌ **Invalid expression**"
-    await message.reply_text(response, quote=True)
-
-
 @app.on_message(filters.command("leavegroup") & filters.user(OWNER_ID))
 async def bot_leave(_, message: Message):
     await message.reply_text("sᴜᴄᴄᴇssғᴜʟʟʏ ʟᴇғᴛ !!")
