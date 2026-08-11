@@ -24,6 +24,7 @@ import config
 from SHUKLAMUSIC import LOGGER, YouTube, app
 from SHUKLAMUSIC.misc import db
 from SHUKLAMUSIC.utils.database import (
+    get_audiomode,
     add_active_chat,
     add_active_video_chat,
     get_autoplay,
@@ -47,6 +48,15 @@ from strings import get_string
 autoend = {}
 counter = {}
 autoplay_history = {}
+
+
+# Audio effects for the per-chat "audio mode" feature (normal/eco/lofi).
+ECO_FILTER = "aecho=0.7:0.65:60:0.22,volume=1.10"
+LOFI_FILTER = (
+    "asetrate=44100*0.92,aresample=44100,atempo=1.0,"
+    "lowpass=f=3800,highpass=f=120,aecho=0.6:0.7:50:0.3,volume=1.15"
+)
+AUDIO_MODE_FILTERS = {"eco": ECO_FILTER, "lofi": LOFI_FILTER}
 
 
 async def queue_autoplay_song(chat_id: int, popped: dict) -> bool:
@@ -141,11 +151,15 @@ class Call(PyTgCalls):
         source: str,
         video: bool,
         ffmpeg: str | None = None,
+        audio_mode: str = "normal",
     ) -> types.MediaStream:
         # Always pass -threads 0 so ffmpeg uses all available cores for
         # decode/encode — reduces CPU bottleneck and streaming stutter.
         base_flags = "-threads 0"
         combined = f"{base_flags} {ffmpeg}" if ffmpeg else base_flags
+        extra_filter = AUDIO_MODE_FILTERS.get(audio_mode)
+        if extra_filter:
+            combined = f"{combined} -af {extra_filter}"
         return types.MediaStream(
             media_path=source,
             audio_parameters=types.AudioQuality.MEDIUM,
@@ -273,6 +287,27 @@ class Call(PyTgCalls):
             db[chat_id][0]["speed_path"] = out
             db[chat_id][0]["speed"] = speed
 
+    async def apply_audio_mode(self, chat_id: int):
+        """Re-apply the chat's current audio mode (normal/eco/lofi) to the
+        track that's already playing, so toggling the mode takes effect
+        immediately instead of only on the next song."""
+        assistant = await group_assistant(self, chat_id)
+        playing = db.get(chat_id)
+        if not playing:
+            raise AssistantErr("Nothing is playing right now.")
+        file_path = playing[0].get("speed_path") or playing[0]["file"]
+        if "downloads" not in file_path and "playback" not in file_path:
+            raise AssistantErr("Umm")
+        audio_mode = await get_audiomode(chat_id)
+        played = playing[0].get("played", 0)
+        duration = playing[0]["dur"]
+        ffmpeg = f"-ss {played} -to {duration}"
+        video_mode = playing[0]["streamtype"] == "video"
+        stream = self._build_stream(
+            file_path, video=video_mode, ffmpeg=ffmpeg, audio_mode=audio_mode
+        )
+        await self._play_on_assistant(assistant, chat_id, stream)
+
     async def force_stop_stream(self, chat_id: int):
         assistant = await group_assistant(self, chat_id)
         try:
@@ -295,17 +330,20 @@ class Call(PyTgCalls):
         image: Union[bool, str] = None,
     ):
         assistant = await group_assistant(self, chat_id)
-        stream = self._build_stream(link, video=bool(video))
+        audio_mode = await get_audiomode(chat_id)
+        stream = self._build_stream(link, video=bool(video), audio_mode=audio_mode)
         await self._play_on_assistant(assistant, chat_id, stream)
 
     async def seek_stream(self, chat_id, file_path, to_seek, duration, mode):
         assistant = await group_assistant(self, chat_id)
+        audio_mode = await get_audiomode(chat_id)
         ffmpeg = f"-ss {to_seek} -to {duration}"
         video_mode = mode == "video"
         stream = self._build_stream(
             file_path,
             video=video_mode,
             ffmpeg=ffmpeg,
+            audio_mode=audio_mode,
         )
         await self._play_on_assistant(assistant, chat_id, stream)
 
@@ -330,7 +368,8 @@ class Call(PyTgCalls):
         assistant = await group_assistant(self, chat_id)
         language = await get_lang(chat_id)
         _ = get_string(language)
-        stream = self._build_stream(link, video=bool(video))
+        audio_mode = await get_audiomode(chat_id)
+        stream = self._build_stream(link, video=bool(video), audio_mode=audio_mode)
         try:
             await self._play_on_assistant(assistant, chat_id, stream)
         except exceptions.NoActiveGroupCall:
@@ -377,6 +416,7 @@ class Call(PyTgCalls):
         queued = check[0]["file"]
         language = await get_lang(chat_id)
         _ = get_string(language)
+        audio_mode = await get_audiomode(chat_id)
         title = (check[0]["title"]).title()
         user = check[0]["by"]
         original_chat_id = check[0]["chat_id"]
@@ -397,7 +437,7 @@ class Call(PyTgCalls):
                     original_chat_id,
                     text=_["call_6"],
                 )
-            stream = self._build_stream(link, video=video)
+            stream = self._build_stream(link, video=video, audio_mode=audio_mode)
             try:
                 await self._play_on_assistant(client, chat_id, stream)
             except Exception:
@@ -433,7 +473,7 @@ class Call(PyTgCalls):
                 return await mystic.edit_text(
                     _["call_6"], disable_web_page_preview=True
                 )
-            stream = self._build_stream(file_path, video=video)
+            stream = self._build_stream(file_path, video=video, audio_mode=audio_mode)
             try:
                 await self._play_on_assistant(client, chat_id, stream)
             except Exception:
@@ -459,7 +499,7 @@ class Call(PyTgCalls):
             db[chat_id][0]["markup"] = "stream"
 
         elif "index_" in queued:
-            stream = self._build_stream(videoid, video=video)
+            stream = self._build_stream(videoid, video=video, audio_mode=audio_mode)
             try:
                 await self._play_on_assistant(client, chat_id, stream)
             except Exception:
@@ -477,7 +517,7 @@ class Call(PyTgCalls):
             db[chat_id][0]["mystic"] = run
             db[chat_id][0]["markup"] = "tg"
         else:
-            stream = self._build_stream(queued, video=video)
+            stream = self._build_stream(queued, video=video, audio_mode=audio_mode)
             try:
                 await self._play_on_assistant(client, chat_id, stream)
             except Exception:
