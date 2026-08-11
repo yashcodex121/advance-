@@ -30,6 +30,11 @@ def track_markup(_, videoid, user_id, channel, fplay, chat_id=None):
                 callback_data=f"ADMIN Autoplay|{chat_id if chat_id else user_id}",
                 style=ButtonStyle.PRIMARY,
             ),
+            InlineKeyboardButton(
+                text="🎚 Audio Mode",
+                callback_data=f"ADMIN AudioMode|{chat_id if chat_id else user_id}",
+                style=ButtonStyle.PRIMARY,
+            ),
         ],
         [
             InlineKeyboardButton(
@@ -80,6 +85,7 @@ def stream_markup_timer(_, chat_id, played, dur):
         ],
         [
             InlineKeyboardButton(text="🔁 Autoplay On/Off", callback_data=f"ADMIN Autoplay|{chat_id}", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="🎚 Audio Mode", callback_data=f"ADMIN AudioMode|{chat_id}", style=ButtonStyle.PRIMARY),
         ],
         [InlineKeyboardButton(text=" ᴄʟᴏsᴇ ▣", callback_data="close", style=ButtonStyle.DANGER, icon_custom_emoji_id=5408832111773757273)],
     ]
@@ -102,6 +108,7 @@ def stream_markup(_, chat_id):
         ],
         [
             InlineKeyboardButton(text="🔁 Autoplay On/Off", callback_data=f"ADMIN Autoplay|{chat_id}", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="🎚 Audio Mode", callback_data=f"ADMIN AudioMode|{chat_id}", style=ButtonStyle.PRIMARY),
         ],
         [InlineKeyboardButton(text=" ᴄʟᴏsᴇ ▣", callback_data="close", style=ButtonStyle.DANGER, icon_custom_emoji_id=5408832111773757273)],
     ]
@@ -130,6 +137,11 @@ def playlist_markup(_, videoid, user_id, ptype, channel, fplay, chat_id=None):
                 text="🔁 Autoplay On/Off",
                 callback_data=f"ADMIN Autoplay|{chat_id if chat_id else user_id}",
                 style=ButtonStyle.SUCCESS,
+            ),
+            InlineKeyboardButton(
+                text="🎚 Audio Mode",
+                callback_data=f"ADMIN AudioMode|{chat_id if chat_id else user_id}",
+                style=ButtonStyle.PRIMARY,
             ),
         ],
         [
