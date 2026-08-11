@@ -19,6 +19,7 @@ from SHUKLAMUSIC.core.call import SHUKLA, queue_autoplay_song
 from SHUKLAMUSIC.misc import SUDOERS, db
 from SHUKLAMUSIC.utils.database import (
     get_active_chats,
+    get_audiomode,
     get_autoplay,
     get_lang,
     get_upvote_count,
@@ -27,6 +28,7 @@ from SHUKLAMUSIC.utils.database import (
     is_nonadmin_chat,
     music_off,
     music_on,
+    set_audiomode,
     set_autoplay,
     set_loop,
 )
@@ -176,6 +178,21 @@ async def del_back_playlist(client, CallbackQuery, _):
             )
         else:
             await CallbackQuery.answer("⏹ Autoplay OFF for this chat.", show_alert=True)
+    elif command == "AudioMode":
+        order = ["normal", "eco", "lofi"]
+        labels = {"normal": "🔊 Normal", "eco": "🍃 Eco", "lofi": "🌙 Lofi"}
+        current = await get_audiomode(chat_id)
+        new_mode = order[(order.index(current) + 1) % len(order)]
+        await set_audiomode(chat_id, new_mode)
+        if await is_music_playing(chat_id):
+            try:
+                await SHUKLA.apply_audio_mode(chat_id)
+            except Exception:
+                pass
+        await CallbackQuery.answer(
+            f"🎚 Audio Mode: {labels[new_mode]}",
+            show_alert=True,
+        )
     elif command == "Pause":
         if not await is_music_playing(chat_id):
             return await CallbackQuery.answer(_["admin_1"], show_alert=True)
