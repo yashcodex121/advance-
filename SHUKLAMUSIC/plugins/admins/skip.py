@@ -16,7 +16,7 @@ from pyrogram.types import InlineKeyboardMarkup, Message
 
 import config
 from SHUKLAMUSIC import YouTube, app
-from SHUKLAMUSIC.core.call import SHUKLA
+from SHUKLAMUSIC.core.call import SHUKLA, queue_autoplay_song
 from SHUKLAMUSIC.misc import db
 from SHUKLAMUSIC.utils.database import get_loop
 from SHUKLAMUSIC.utils.decorators import AdminRightsCheck
@@ -53,18 +53,21 @@ async def skip(cli, message: Message, _, chat_id):
                             if popped:
                                 await auto_clean(popped)
                             if not check:
-                                try:
-                                    await message.reply_text(
-                                        text=_["admin_6"].format(
-                                            message.from_user.mention,
-                                            message.chat.title,
-                                        ),
-                                        reply_markup=close_markup(_),
-                                    )
-                                    await SHUKLA.stop_stream(chat_id)
-                                except:
-                                    return
-                                break
+                                if await queue_autoplay_song(chat_id, popped):
+                                    check = db.get(chat_id)
+                                else:
+                                    try:
+                                        await message.reply_text(
+                                            text=_["admin_6"].format(
+                                                message.from_user.mention,
+                                                message.chat.title,
+                                            ),
+                                            reply_markup=close_markup(_),
+                                        )
+                                        await SHUKLA.stop_stream(chat_id)
+                                    except:
+                                        return
+                                    break
                     else:
                         return await message.reply_text(_["admin_11"].format(count))
                 else:
@@ -81,16 +84,19 @@ async def skip(cli, message: Message, _, chat_id):
             if popped:
                 await auto_clean(popped)
             if not check:
-                await message.reply_text(
-                    text=_["admin_6"].format(
-                        message.from_user.mention, message.chat.title
-                    ),
-                    reply_markup=close_markup(_),
-                )
-                try:
-                    return await SHUKLA.stop_stream(chat_id)
-                except:
-                    return
+                if await queue_autoplay_song(chat_id, popped):
+                    check = db.get(chat_id)
+                else:
+                    await message.reply_text(
+                        text=_["admin_6"].format(
+                            message.from_user.mention, message.chat.title
+                        ),
+                        reply_markup=close_markup(_),
+                    )
+                    try:
+                        return await SHUKLA.stop_stream(chat_id)
+                    except:
+                        return
         except:
             try:
                 await message.reply_text(
