@@ -30,6 +30,7 @@ langdb = mongodb.language
 onoffdb = mongodb.onoffper
 playmodedb = mongodb.playmode
 playtypedb = mongodb.playtypedb
+lofidb = mongodb.lofimode
 skipdb = mongodb.skipmode
 sudoersdb = mongodb.sudoers
 usersdb = mongodb.tgusersdb
@@ -49,6 +50,7 @@ nonadmin = {}
 pause = {}
 playmode = {}
 playtype = {}
+lofimode = {}
 skipmode = {}
 autoplay = {}
 autoplay_owner = {}
@@ -314,6 +316,29 @@ async def get_playmode(chat_id: int) -> str:
 async def set_playmode(chat_id: int, mode: str):
     playmode[chat_id] = mode
     await playmodedb.update_one(
+        {"chat_id": chat_id}, {"$set": {"mode": mode}}, upsert=True
+    )
+
+
+async def get_audiomode(chat_id: int) -> str:
+    """Per-chat audio effect: 'normal', 'eco' (light echo) or 'lofi'
+    (slowed + echo). Applies to the current + all future songs until
+    changed."""
+    mode = lofimode.get(chat_id)
+    if mode is None:
+        data = await lofidb.find_one({"chat_id": chat_id})
+        if not data:
+            lofimode[chat_id] = "normal"
+            return "normal"
+        mode = data.get("mode", "normal")
+        lofimode[chat_id] = mode
+        return mode
+    return mode
+
+
+async def set_audiomode(chat_id: int, mode: str):
+    lofimode[chat_id] = mode
+    await lofidb.update_one(
         {"chat_id": chat_id}, {"$set": {"mode": mode}}, upsert=True
     )
 
