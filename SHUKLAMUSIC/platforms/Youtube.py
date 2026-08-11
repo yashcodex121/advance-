@@ -7,6 +7,7 @@ from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message
 from py_yt import VideosSearch, Playlist
 import aiohttp
+from SHUKLAMUSIC.utils.formatters import seconds_to_min
 
 API_URL = os.environ.get("SHRUTI_API_URL", "https://api01.shrutibots.site")
 
@@ -253,8 +254,50 @@ class YouTubeAPI:
         return title, duration_min, thumbnail, vidid
 
     async def related(self, videoid: str, exclude_ids: Union[list, set, None] = None):
+        """Real 'up next' style recommendations — pulls YouTube's own
+        auto-generated Mix/Radio playlist for the seed video (the same
+        list YouTube shows as related/autoplay), instead of just
+        re-searching the seed's title (which mostly returns near-duplicate
+        uploads of the same song)."""
         exclude_ids = set(exclude_ids or [])
         exclude_ids.add(videoid)
+        mix_url = f"https://www.youtube.com/watch?v={videoid}&list=RD{videoid}"
+        ytdl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": True,
+            "skip_download": True,
+        }
+
+        def _extract():
+            with yt_dlp.YoutubeDL(ytdl_opts) as ydl:
+                return ydl.extract_info(mix_url, download=False)
+
+        entries = []
+        try:
+            info = await asyncio.get_event_loop().run_in_executor(None, _extract)
+            entries = info.get("entries") or []
+        except Exception:
+            entries = []
+
+        for item in entries:
+            if not item:
+                continue
+            vid = item.get("id")
+            if not vid or vid in exclude_ids:
+                continue
+            duration_sec = item.get("duration")
+            if not duration_sec:
+                continue
+            return {
+                "title": item.get("title") or "Unknown",
+                "vidid": vid,
+                "duration_min": seconds_to_min(duration_sec),
+                "thumb": (item.get("thumbnails") or [{}])[-1].get("url", ""),
+                "link": f"https://www.youtube.com/watch?v={vid}",
+            }
+
+        # Fallback: mix unavailable/exhausted -> nearest title-search match.
         try:
             seed = VideosSearch(self.base + videoid, limit=1)
             seed_result = (await seed.next())["result"]
